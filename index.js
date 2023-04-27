@@ -1,24 +1,13 @@
 const express = require("express");
-const { connection } = require("./configs/db");
 const cors = require("cors");
-
-const { userRouter } = require("./router/userRoute");
-const { flightRouter } = require("./router/flightRoute");
-const { bookingRouter } = require("./router/bookingRoute");
-
+const { connection } = require("./configs/db");
+const { userRouter } = require("./routes/userRoute");
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-
-app.get("/", (req, res) => {
-    res.status(200).send("Home Page");
-});
-
-app.use("/api", userRouter);
-app.use("/api", flightRouter);
-app.use("/api", bookingRouter);
+app.use("/", userRouter);
 
 
 app.listen(8000, async () => {
