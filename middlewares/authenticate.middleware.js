@@ -8,6 +8,7 @@ const authenticate = (req, res, next) => {
         if (decoded) {
             let userID = decoded.userID;
             req.body.userID = userID;
+            // console.log(userID);
             next();
         } else {
             res.json("please login first");

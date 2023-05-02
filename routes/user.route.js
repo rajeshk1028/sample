@@ -2,15 +2,15 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const { authenticate } = require("../middlewares/authenticate.middleware");
 dotenv.config();
 
+const { authenticate } = require("../middlewares/authenticate.middleware");
 const { UserModel } = require("../models/user.model");
 
 
 const userRouter = express.Router();
 
-userRouter.get("/", async (req, res) => {
+userRouter.get("/users", async (req, res) => {
     try {
         let users = await UserModel.find();
         res.json(users);
@@ -20,11 +20,12 @@ userRouter.get("/", async (req, res) => {
 })
 
 userRouter.post("/register", async (req, res) => {
-    let { email, password } = req.body;
+    let { name, email, password, dob, bio } = req.body;
     try {
+        dob = new Date(dob);
         bcrypt.hash(password, 5, async (err, hashed_password) => {
             if (hashed_password) {
-                let user = new UserModel({ email, password: hashed_password });
+                let user = new UserModel({ name, email, password: hashed_password, dob, bio });
                 await user.save();
                 res.status(201).json("user registered successfully");
             } else {
@@ -47,8 +48,8 @@ userRouter.post("/login", async (req, res) => {
             try {
                 bcrypt.compare(password, hashed_password, async (err, result) => {
                     if (result) {
-                        let token = jwt.sign({ userID: user._id }, process.env.key, { expiresIn: 1000 });
-                        res.status(200).json({ status: "Login Successfull", token });
+                        let token = jwt.sign({ userID: user._id }, process.env.key);
+                        res.status(201).json({ status: "Login Successfull", token });
                     } else {
                         res.json("incorrect password");
                     }
@@ -66,41 +67,52 @@ userRouter.post("/login", async (req, res) => {
 
 userRouter.use(authenticate);
 
-userRouter.get("/getProfile", async (req, res) => {
-    let id = req.body.userID;
+userRouter.get("/users/:id/friends", async (req, res) => {
     try {
-        let profile = await UserModel.find({ _id: id });
-        res.status(200).json(profile);
+        const id = req.params.id;
+        let users = await UserModel.findOne({ _id: id });
+        res.send({ "Friends": users.friends });
     } catch (error) {
         res.json(error);
     }
 })
 
-userRouter.patch("/editProfile", async (req, res) => {
-    let id = req.body.userID;
-    const { photo, name, bio, phone, email, password } = req.body;
+userRouter.post("/users/:id/friends", async (req, res) => {
     try {
-        bcrypt.hash(password, 5, async (err, hashed_password) => {
-            if (hashed_password) {
-                await UserModel.findByIdAndUpdate({ _id: id }, { photo, name, bio, phone, email, password: hashed_password });
-                res.status(204).json("updated successfully");
-            } else {
-                res.json(err);
+        const id = req.params.id;
+        const myId = req.body.userId || req.body.userID;
+        let users = await UserModel.findOne({ _id: id });
+        users.friendRequests.push({ _id: myId });
+        await UserModel.findByIdAndUpdate({ _id: id }, users);
+        res.send("Friend request sent successfully");
+    } catch (error) {
+        res.json(error);
+    }
+})
+
+userRouter.patch("/users/:id/friends/:friendId", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const friendId = req.params.friendId;
+        let status = req.body.status;
+        const myId = req.body.userId || req.body.userID;
+        let users = await UserModel.findOne({ _id: id });
+        users.friendRequests.forEach((elem, i) => {
+            if (elem == friendId) {
+                if (status) {
+                    users.friends.push(elem)
+                    users.friendRequests.splice(i, 1);
+                } else {
+                    users.friendRequests.splice(i, 1);
+                };
             }
-        });
-
+        })
+        await UserModel.findByIdAndUpdate({ _id: id }, users);
+        res.json("Friend request updated successfully");
     } catch (error) {
         res.json(error);
     }
 })
 
-userRouter.get("/logout", async (req, res) => {
-    try {
-        await UserModel.find();
-        res.status(200).json("logout successfull");
-    } catch (error) {
-        res.json(error);
-    }
-})
 
 module.exports = { userRouter }
